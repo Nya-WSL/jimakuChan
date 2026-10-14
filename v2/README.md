@@ -19,7 +19,7 @@ js/app.js         設定画面ロジック（設定 ⇄ DOM，エンジン制御
 js/overlay.js     表示ページ（BroadcastChannel / DOM イベント / postMessage で受信）
 js/mic.js         マイク選択（デバイス一覧・getUserMedia）・入力レベル計測（AnalyserNode / dBFS）・音声処理（ゲイン／ノイズゲート／2 つ目の入力／ミュート）
 js/recognizer.js  Web Speech API 音声認識（2 インスタンス交互・自動再開・ローカルモデル対応）
-js/translator.js  翻訳（Chrome 内蔵 Translator API → GAS フォールバック）
+js/translator.js  翻訳（Chrome 内蔵／百度翻訳／GAS．選んだ方法 → 百度 → Chrome → GAS の順に回退）
 js/chrome_translator.js  Chrome Translator API ラッパ（v1 から継承）
 js/filter.js      伏字フィルタ（goodBadWordlist 読込・単語境界判定）
 js/obs.js         obs-websocket v5 クライアント（依存なし）
@@ -72,6 +72,24 @@ Chrome(index.html)  ── 音声認識 ──▶ 語句置換 → 伏字 → �
 表示内容の更新・消え方は通常表示と同じ（新しい文で置き換わり，無音タイマーで消える）．認識行だけ 1 行にして，翻訳は複数行で折り返す，という組合せもできる．
 実装：`.line[data-wrap="nowrap"]{direction:rtl}` で溢れを左側に逃がし，中の `.txt` を `direction:ltr` に戻す．
 （2026-08-17 まで存在した「過去の確定文を同じ行に蓄積して左へ流す」動作は廃止：前の文が残って見えるため）
+
+## 翻訳（Chrome 内蔵／百度／GAS）
+「基本」タブの翻訳方法で 3 つから選べます．選んだ方法が使えない・失敗したときは **百度 → Chrome → GAS** の順で回退します（どの方法を使うかは利用者が選ぶ．勝手に切り替わりません）．
+
+| 方法 | 設定 | 備考 |
+|---|---|---|
+| Chrome 内蔵 | なし | Chrome 138+．PC 内で翻訳するので速い・無料．言語ごとに初回だけモデルのダウンロードが必要 |
+| 百度翻訳 | 代理 URL（＋ APP ID・密钥） | 中国本土など Google が届かない環境向け．百度の API は CORS 非対応なので **Vercel の代理**（`proxy/baidu_proxy`）経由で呼ぶ．署名（MD5）は代理側で作る |
+| Google 翻訳 (GAS) | GAS キー | Google Apps Script のプロキシ．[作り方](http://www.sayonari.com/trans_asr/index_asr.html) |
+
+### 百度翻訳の設定
+1. **リポジトリ全体を Vercel にデプロイする**（おすすめ）：サイト本体と `https://<project>.vercel.app/api/translate` が同時にでき，アプリは同じサイトの代理を**自動検出**します（設定不要．状態が「代理 設定済み（同一サイト）」になります）
+   - アプリは GitHub Pages のまま，代理だけ別に立てる場合は `proxy/baidu_proxy` を単体デプロイし（`cd proxy/baidu_proxy && npx vercel deploy --prod`），設定画面の「代理 URL」にその URL を入れます（ルート URL だけでも `/api/translate` を補います）
+2. APP ID・密钥は，代理の環境変数（`BAIDU_APPID` / `BAIDU_KEY`）に入れておけばアプリ側は空欄で構いません（その場合，その代理を使う全員がその無料枠を消費します）
+
+- 語種コードは自動変換（ja→`jp`，ko→`kor`，zh-CN→`zh`，zh-TW/zh-HK→`cht`，es→`spa` …）．表に無い言語は百度を使わず，他の方法へ回します
+- 無料枠は標準版 5 万文字/月・QPS 1，実名認証後の高級版 100 万文字/月・QPS 10．字幕は 1 文ごとに翻訳先の数だけリクエストするので，QPS 1 では「アクセス頻度の制限」が出やすい
+- 失敗時は `error_code` ごとの文言を表示し，52001／52002（タイムアウト・系統エラー）は 1 回だけ再試行します
 
 ## 伏字（センシティブワード）
 - 単語リストは [goodBadWordlist](https://github.com/sayonari/goodBadWordlist) から認識言語・翻訳言語ごとに取得

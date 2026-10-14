@@ -1,0 +1,10 @@
+{
+  "name": "jimakuchan-baidu-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "jimakuChan 用：百度翻訳（通用文本翻訳 API）の CORS 代理（Vercel サーバーレス関数・依存なし）",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

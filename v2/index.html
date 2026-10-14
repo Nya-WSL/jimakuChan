@@ -193,16 +193,24 @@
       </div>
       <div class="row" style="margin-top:8px">
         <label data-i18n="lTransMethod">翻訳方法</label>
-        <div class="seg pinky" data-seg="translationMethod"><button data-val="chrome" data-i18n="methodChrome">Chrome内蔵（高速・無料）</button><button data-val="gas" data-i18n="methodGas">Google翻訳 (GAS)</button></div>
+        <div class="seg pinky" data-seg="translationMethod"><button data-val="chrome" data-i18n="methodChrome">Chrome内蔵（高速・無料）</button><button data-val="baidu" data-i18n="methodBaidu">百度翻訳</button><button data-val="gas" data-i18n="methodGas">Google翻訳 (GAS)</button></div>
         <span class="status" id="chromeApiStatus"></span>
         <button class="btn mini" id="btnDownloadModels" hidden data-i18n="btnDlModels">翻訳モデルをダウンロード</button>
       </div>
-      <div class="row" id="rowGas">
-        <label data-i18n="lGasKey">GAS キー</label>
-        <input type="text" data-bind="gasKey" class="grow" data-i18n-ph="phGasKey" placeholder="Google Apps Script のデプロイ ID">
-        <a target="_blank" href="http://www.sayonari.com/trans_asr/index_asr.html" class="hint" data-i18n="gasHow">[作成方法]</a>
+      <div class="row" id="rowBaidu">
+        <label data-i18n="lBaiduProxy">代理 URL</label>
+        <input type="text" data-bind="baiduProxyUrl" class="grow" data-i18n-ph="phBaiduProxy" placeholder="https://xxx.vercel.app/api/translate（空欄なら同一サイトを自動検出）">
+        <span class="status" id="baiduStatus"></span>
+        <a target="_blank" href="https://github.com/sayonari/jimakuChan/blob/main/proxy/baidu_proxy/README.md" class="hint" data-i18n="baiduHow">[作り方]</a>
       </div>
-      <p class="help" id="chromeApiHelp" data-i18n="chromeApiHelp">Chrome 138 以降なら，PC 内で動く高速翻訳が使えます（言語ごとに初回だけモデルのダウンロードが必要）．それ以外のブラウザや言語では GAS キーを使った Google 翻訳になります．</p>
+      <div class="row" id="rowBaiduKeys">
+        <label data-i18n="lBaiduAppId">APP ID</label>
+        <input type="text" data-bind="baiduAppId" class="grow" data-i18n-ph="phBaiduAppId" placeholder="百度の APP ID（代理に設定済みなら空欄でOK）">
+        <label data-i18n="lBaiduKey">密钥</label>
+        <input type="password" data-bind="baiduKey" class="grow" data-i18n-ph="phBaiduKey" placeholder="百度の密钥（同上）">
+      </div>
+      <p class="help" id="baiduHelp" data-i18n="baiduHelp">百度翻訳は，このアプリから直接呼べない（CORS 非対応）ため，Vercel の代理経由で使います．リポジトリ全体を Vercel にデプロイしていれば /api/translate を自動で見つけて使います（設定不要．状態が「代理 設定済み（同一サイト）」になります）．別の場所の代理を使うときだけ代理 URL を入れてください．無料枠は標準版 5 万文字/月（QPS 1），実名認証後の高級版 100 万文字/月（QPS 10）．字幕は 1 文ごとに翻訳先の数だけリクエストするので，QPS 1 では「アクセス頻度の制限」が出ることがあります．APP ID・密钥は代理の環境変数に設定してあれば空欄で構いません．</p>
+      <p class="help" id="chromeApiHelp" data-i18n="chromeApiHelp">Chrome 138 以降なら，PC 内で動く高速翻訳が使えます（言語ごとに初回だけモデルのダウンロードが必要）．それ以外のブラウザや言語では GAS キーを使った Google 翻訳，中国本土など Google が届かない環境では百度翻訳になります．</p>
     </div>
   </section>
 

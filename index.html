@@ -169,6 +169,15 @@
             <a target="_blank" href="http://www.sayonari.com/trans_asr/index_asr.html" style="font-size: 11px;" data-i18n="apiKeyHowTo">[作成方法]</a>
             <span style="font-size: 13px;">　<span data-i18n="transLabel">翻訳：</span><span id="translationStatus" style="font-weight: bold; color: #666;" data-i18n="transWaiting">待機中</span></span>
         </div>
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px; flex-wrap: wrap; font-size: 12.5px;">
+            <span data-i18n="baiduProxyLabel">百度 代理 URL：</span>
+            <input type="text" name="baidu_proxy" id="baidu_proxy" size="34" oninput="updateOptionValues();" style="height: 22px;" placeholder="空欄なら同一サイトの /api/translate を自動検出（別サイトは https://xxx.vercel.app/api/translate）" />
+            <span data-i18n="baiduAppIdLabel">APP ID：</span>
+            <input type="text" name="baidu_appid" id="baidu_appid" size="13" oninput="updateOptionValues();" style="height: 22px;" />
+            <span data-i18n="baiduKeyLabel">密钥：</span>
+            <input type="password" name="baidu_key" id="baidu_key" size="13" oninput="updateOptionValues();" style="height: 22px;" />
+            <a target="_blank" href="https://github.com/sayonari/jimakuChan/blob/main/proxy/baidu_proxy/README.md" style="font-size: 11px;" data-i18n="baiduHowTo">[作り方]</a>
+        </div>
         <div style="font-size: 13px;">
             <span id="apiModeDisplay">
                 <span data-i18n="transCount">翻訳回数：</span><span id="displayTransCount">0</span><span style="color: gray; font-size: 11px;" data-i18n="transFreeLimit">（無料上限5,000回）</span>
@@ -182,6 +191,11 @@
                     <input type="radio" name="translationMethod" value="chrome" id="translationMethodChrome"
                            onchange="switchTranslationMethod()" checked>
                     <span data-i18n="chromeBuiltIn">Chrome内蔵(高速)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 14px; color: #1a5e3a;">
+                    <input type="radio" name="translationMethod" value="baidu" id="translationMethodBaidu"
+                           onchange="switchTranslationMethod()">
+                    <span data-i18n="baiduApi">百度翻訳</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 14px; color: #1a5e3a;">
                     <input type="radio" name="translationMethod" value="gas" id="translationMethodGas"
@@ -1215,7 +1229,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
 
     // config 値　一覧 ////////////////
-    config_values = ["gas_key", "textAlign", "v_align", "whiteSpace", "bgcolor", "frame_height"
+    config_values = ["gas_key", "baidu_proxy", "baidu_appid", "baidu_key", "textAlign", "v_align", "whiteSpace", "bgcolor", "frame_height"
         , "recog", "size1", "weight1", "color1", "st_color1", "st_width1"
         , "trans", "size2", "weight2", "color2", "st_color2", "st_width2"
         , "trans2", "size3", "weight3", "color3", "st_color3", "st_width3"
@@ -1386,32 +1400,27 @@ window.addEventListener('DOMContentLoaded', function() {
 
     // 翻訳方法の切り替え処理
     function switchTranslationMethod() {
-        const chromeRadio = document.getElementById('translationMethodChrome');
-        const gasRadio = document.getElementById('translationMethodGas');
         const notice = document.getElementById('chromeTranslationNotice');
         const modelArea = document.getElementById('modelDownloadArea');
+        const selectedMethod = getTranslationMethod();   // 'chrome' | 'baidu' | 'gas'
         
-        if (chromeRadio.checked) {
+        if (selectedMethod === 'chrome') {
             // Chrome内蔵翻訳選択時
             notice.style.display = 'block';
             // モデルダウンロードエリアの表示状態を確認するためチェック実行
             checkAllTranslationModels();
-            
-            // iframe内に翻訳方法変更を通知（タイマー開始のため）
-            updateTranslationMethodInIframe('chrome');
         } else {
-            // GAS API選択時
+            // 百度翻訳・GAS API選択時（Chrome のモデルは使わない）
             notice.style.display = 'none';
             if (modelArea) {
                 modelArea.style.display = 'none';
             }
-            
-            // iframe内に翻訳方法変更を通知（タイマー停止のため）
-            updateTranslationMethodInIframe('gas');
         }
         
+        // iframe内に翻訳方法変更を通知（タイマー開始/停止のため）
+        updateTranslationMethodInIframe(selectedMethod);
+        
         // localStorage に保存
-        const selectedMethod = chromeRadio.checked ? 'chrome' : 'gas';
         saveTranslationMethodToStorage(selectedMethod);
         
         // プリセットに自動保存
@@ -1465,12 +1474,12 @@ window.addEventListener('DOMContentLoaded', function() {
     
     // 初期化時に翻訳方法の値を取得する関数
     function getTranslationMethod() {
-        const chromeRadio = document.getElementById('translationMethodChrome');
-        if (!chromeRadio) {
+        const checked = document.querySelector('input[name="translationMethod"]:checked');
+        if (!checked) {
             // ラジオボタンがまだ存在しない場合はlocalStorageから取得
             return loadTranslationMethodFromStorage();
         }
-        return chromeRadio.checked ? 'chrome' : 'gas';
+        return checked.value;   // 'chrome' | 'baidu' | 'gas'
     }
     
     // ページ読み込み時に翻訳方法を復元する関数
@@ -1482,16 +1491,12 @@ window.addEventListener('DOMContentLoaded', function() {
         const notice = document.getElementById('chromeTranslationNotice');
         
         if (chromeRadio && gasRadio && notice) {
-            // ラジオボタンの状態を設定
-            if (savedMethod === 'chrome') {
-                chromeRadio.checked = true;
-                gasRadio.checked = false;
-                notice.style.display = 'block';
-            } else {
-                chromeRadio.checked = false;
-                gasRadio.checked = true;
-                notice.style.display = 'none';
-            }
+            // ラジオボタンの状態を設定（chrome / baidu / gas）
+            chromeRadio.checked = (savedMethod === 'chrome');
+            gasRadio.checked = (savedMethod === 'gas');
+            const baiduRadioLoad = document.getElementById('translationMethodBaidu');
+            if (baiduRadioLoad) baiduRadioLoad.checked = (savedMethod === 'baidu');
+            notice.style.display = (savedMethod === 'chrome') ? 'block' : 'none';
             
             // iframe内にも通知
             updateTranslationMethodInIframe();
@@ -1655,6 +1660,10 @@ window.addEventListener('DOMContentLoaded', function() {
             new_url = new_url + "&anti_sexual=" + "true";
         }
         if(gas_key != '') {new_url = new_url + "&gas_key=" + gas_key;}
+        // 百度翻訳（代理 URL・APP ID・密钥）
+        if(baidu_proxy != '') {new_url = new_url + "&baidu_proxy=" + encodeURIComponent(baidu_proxy);}
+        if(baidu_appid != '') {new_url = new_url + "&baidu_appid=" + encodeURIComponent(baidu_appid);}
+        if(baidu_key != '') {new_url = new_url + "&baidu_key=" + encodeURIComponent(baidu_key);}
         if(translation_method != '') {new_url = new_url + "&translation_method=" + translation_method;}
    
         // config の更新
@@ -2430,6 +2439,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "📋 選択してください",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2476,6 +2488,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "🎮 ゲーム配信用",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2522,6 +2537,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "💼 会議・打ち合わせ用",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "left",
                 v_align: "top",
                 whiteSpace: "",
@@ -2568,6 +2586,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "📚 語学学習用",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "center",
                 whiteSpace: "",
@@ -2614,6 +2635,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "♿ アクセシビリティ重視",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2660,6 +2684,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "🌸 かわいい配信用",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2706,6 +2733,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "🌙 ダークテーマ",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2752,6 +2782,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "🌈 レインボー",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2798,6 +2831,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "🔧 カスタム１",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2844,6 +2880,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "🔧 カスタム２",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -2890,6 +2929,9 @@ window.addEventListener('DOMContentLoaded', function() {
             name: "🔧 カスタム３",
             settings: {
                 gas_key: "",
+                baidu_proxy: "",
+                baidu_appid: "",
+                baidu_key: "",
                 textAlign: "center",
                 v_align: "bottom",
                 whiteSpace: "",
@@ -3012,16 +3054,12 @@ window.addEventListener('DOMContentLoaded', function() {
                     console.log('翻訳方法をlocalStorageから復元:', methodToApply);
                 }
                 
-                // ラジオボタンと注意書きを設定
-                if (methodToApply === 'chrome') {
-                    chromeRadio.checked = true;
-                    gasRadio.checked = false;
-                    notice.style.display = 'block';
-                } else {
-                    chromeRadio.checked = false;
-                    gasRadio.checked = true;
-                    notice.style.display = 'none';
-                }
+                // ラジオボタンと注意書きを設定（chrome / baidu / gas）
+                chromeRadio.checked = (methodToApply === 'chrome');
+                gasRadio.checked = (methodToApply === 'gas');
+                var baiduRadioPreset = document.getElementById('translationMethodBaidu');
+                if (baiduRadioPreset) baiduRadioPreset.checked = (methodToApply === 'baidu');
+                notice.style.display = (methodToApply === 'chrome') ? 'block' : 'none';
                 
                 // 設定をlocalStorageにも保存（同期のため）
                 saveTranslationMethodToStorage(methodToApply);
@@ -3125,16 +3163,12 @@ window.addEventListener('DOMContentLoaded', function() {
                     console.log('翻訳方法をlocalStorageから復元:', methodToApply);
                 }
                 
-                // ラジオボタンと注意書きを設定
-                if (methodToApply === 'chrome') {
-                    chromeRadio.checked = true;
-                    gasRadio.checked = false;
-                    notice.style.display = 'block';
-                } else {
-                    chromeRadio.checked = false;
-                    gasRadio.checked = true;
-                    notice.style.display = 'none';
-                }
+                // ラジオボタンと注意書きを設定（chrome / baidu / gas）
+                chromeRadio.checked = (methodToApply === 'chrome');
+                gasRadio.checked = (methodToApply === 'gas');
+                var baiduRadioPreset = document.getElementById('translationMethodBaidu');
+                if (baiduRadioPreset) baiduRadioPreset.checked = (methodToApply === 'baidu');
+                notice.style.display = (methodToApply === 'chrome') ? 'block' : 'none';
                 
                 // 設定をlocalStorageにも保存（同期のため）
                 saveTranslationMethodToStorage(methodToApply);

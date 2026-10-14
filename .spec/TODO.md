@@ -1,5 +1,25 @@
 # TODO - タスクリスト
 
+## 2026-10-15 追加：フロント＋代理を Vercel にまとめてデプロイ（詳細は SPEC.md 追記）
+- [x] ルート `api/translate.js`（`proxy/baidu_proxy/api/translate.js` を読み込む入り口）・`vercel.json`（リージョン hkg1）・`.vercelignore`
+- [x] v2：同一サイトの代理を自動検出（`detectSameOriginProxy`）＋状態表示「代理 設定済み（同一サイト）」＋ `/api/translate` 相対パス対応
+- [x] v1：`main.html` で起動時に自動検出（`baiduAutoProxy` / `effectiveBaiduProxy`）＋相対パス対応＋タイムアウト処理
+- [x] タイムアウト調整（代理 8 秒／アプリ 15 秒），proxy と v2/README に Vercel 一括デプロイ手順（方式 A/B）を追記
+- [x] 回帰テストに自動検出・相対パスのチェックを追加し ALL PASS（27 項目）
+- [ ] 先生の実機テスト（Vercel にルートをデプロイ → 開くだけで百度翻訳が使えるか）→ コミット・push
+
+## 2026-10-14 追加：翻訳方法「百度翻訳」対応（v1・v2／詳細は SPEC.md 追加分）
+- [x] Vercel プロキシを新規作成（`proxy/baidu_proxy/`：api/translate.js・package.json・README.md）
+- [x] v2：`js/translator.js` に百度メソッド＋言語マップ＋error_code の文言＋フォールバック
+- [x] v2：設定 UI（翻訳方法 3 択／代理 URL・APP ID・密钥）・`presets.js` DEFAULTS・`i18n.js`（日英）・`app.js`（状態表示）
+- [x] v1：`index.html`（ラジオ追加・入力欄・config_values・URL パラメータ・プリセット・`js/i18n.js`・switchTranslationMethod）
+- [x] v1：`main.html`（URL パラメータ受取・百度を Chrome より先に試す・言語マップ・ステータス表示・Chrome/GAS への回退）
+- [x] ドキュメント（v2/README.md に「翻訳」節・proxy の README）
+- [x] ローカル検証：`v2/tools/promo_video/test_baidu.mjs`（代理＋エンジンの 24 項目 ALL PASS．うち 1 項目は実ネットワークで百度まで到達し `52003 UNAUTHORIZED USER` が返ることを確認）＋ HTML 内インライン script を含む構文チェック（この環境には playwright が無いため UI テストはスキップ．`npm i playwright` があれば (3) の UI 配線テストも走る）
+- [ ] 先生の実機テスト → コミット・push（VERSION は 2026.10.14 20:35 に更新済み．テスト前にコミットしない）
+- [ ] 決定の記録：百度「网页版」は Acs-Token 反爬で再現不可 → **公式 API のみ**／翻訳方法は自動切替しない（利用者の選択のみ）
+- [ ] 未対応：v1 の「困ったときは」ページ（sayonari_web）への百度の作り方の追記（必要なら）
+
 ## 2026-10-14 整理（一覧は .output/2026-10-14_現状とToDo_入力ソース拡張案.html）
 - [x] 入力ソース拡張 実装済（2026-10-14・test_tab_audio.mjs ALL PASS）→ [ ] 先生実機テスト → コミット・push（VERSION 更新）．元の案：：①欄名「マイク」→「音声入力」＋「ライン入力・オーディオインターフェースも選べます」（ライン入力は既に audioinput として一覧に出る）／②プルダウンに「Chromeのタブの音声…」（getDisplayMedia → mic.js の処理経路へ．ジュノーンさん方式）
 - [x] 「困ったときは」追記 → 2026-10-14 アップロード済

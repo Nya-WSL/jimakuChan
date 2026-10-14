@@ -12,6 +12,30 @@
 - obs-websocket v5：`CallVendorRequest{vendorName:'obs-browser', requestType:'emit_event', requestData:{event_name, event_data}}` で全ブラウザソースに DOM イベントを送れる．認証は sha256(base64(sha256(pw+salt))+challenge)
 - Chrome の -webkit-text-stroke は角が尖る（miter）．v1 と同じ．`paint-order: stroke fill` は Chrome 123+ / OBS 31+ で HTML テキストに使えるが，CEF が古い OBS もあるので擬似要素 2 層方式を採用
 
+## 2026-10-14 百度翻訳（通用文本翻訳）対応の調査結果
+- 通用文本翻訳 API は `POST https://fanyi-api.baidu.com/api/trans/vip/translate`，
+  `sign = MD5(appid + q + salt + 密钥)`，応答は `trans_result[].dst` か `error_code`
+- **CORS 非対応（実測）**：`Origin: https://sayonari.github.io` を付けた POST / OPTIONS のどちらも
+  `Access-Control-Allow-Origin` を返さない（200 だがヘッダ無し）→ ブラウザ直叩きは不可．プロキシ必須
+  （同じ結論の事例：CSDN「解决 CORS 跨域资源共享（以百度翻译 API 为例）」）
+- `crypto.subtle` に MD5 は無い → 署名はプロキシ側（Node）で作るのが素直．アプリ側に MD5 実装を足さない
+- 無料枠：標準版は 5 万文字/月・QPS 1（未認証），個人実名認証で高級版 100 万文字/月・QPS 10．
+  超過は 49 元/100 万文字．字幕は 1 文＝1 リクエスト（翻訳先ごと）なので **QPS 1 では 54003 が出やすい**
+- 同名の紛らわしい API に注意：`/product/113`＝通用文本翻訳（appid+sign），
+  `doc/21` は現在「大模型文本翻訳」で `Authorization: Bearer` の API Key 認証（別物）
+
+## 2026-10-14 追記：百度「网页版（非公式）」接口は使えないと結論
+- 現行の fanyi.baidu.com フロント（`index.a5023d3d.js` 5.4MB）は `v2transapi` を呼んでいない．
+  `window.v2Fetch({url:"/transapi", method:"POST", acsConf:{useAcsToken:true}})` →
+  **`Acs-Token` ヘッダ必須**（百度の ACS 風控 SDK が `a.e.create({sid, timeout:5000})` で実行時に生成．
+  sid・時刻・環境依存の反爬トークン）
+- 旧記事の方式（2018 hujingshuang／2023 CSDN：`token`＋`gtk`＋`sign`）は前提が消滅：
+  現在の HTML・JS に `token` / `gtk` / `v2transapi` は存在しない（実測）
+- 実測結果：`v2transapi` は Cookie 無しで `errno 1022`（風控），Cookie 有りでも `errno 995`（token/sign 不正相当）．
+  `transapi` は Referer 無しで空ボディ，Referer 有りで 1022
+- 結論：网页版は反爬で守られており，サーバー（とくに Vercel のような机房 IP）から再現するのは非現実的．
+  正式には官方 API（appid＋MD5 署名）を使う（利用者に案内済み）
+
 ## 技術的な知見
 - BroadcastChannel は file:// では別ウィンドウに届かないことがある → popup には postMessage も併用
 - Playwright headless で `Translator.availability()` の Promise が GC される → タイムアウトで保護

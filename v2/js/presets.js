@@ -11,7 +11,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '2026.10.14 19:09';   // 更新時に日付＋時刻（JST）を書き換える
+  const VERSION = '2026.10.15 00:38';   // 更新時に日付＋時刻（JST）を書き換える
   const KEY = 'jimakuChan_v2_presets';
   const KEY_UI = 'jimakuChan_v2_ui';
 
@@ -23,6 +23,7 @@
     wordBoost: '', wordBoostStrength: 5,
     // 翻訳
     trans: ['en', 'none', 'none'], translationMethod: 'chrome', gasKey: '',
+    baiduProxyUrl: '', baiduAppId: '', baiduKey: '',   // 百度翻訳（代理 URL は必須．APP ID・密钥は代理の環境変数でも可）
     // 見た目
     theme: 'outline', anim: 'none', boxColor: 'rgba(0,0,0,0.55)', boxRadius: 12, strokeMode: 'round',
     lines: [line(), line(), line(), line()],

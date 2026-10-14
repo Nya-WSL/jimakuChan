@@ -225,6 +225,33 @@
 
         var gas_key = getParam('gas_key');
 
+        // 百度翻訳（通用文本翻訳 API）の設定：代理 URL・APP ID・密钥
+        var baidu_proxy = getParam('baidu_proxy');
+        var baidu_appid = getParam('baidu_appid');
+        var baidu_key = getParam('baidu_key');
+        // 同一サイト（リポジトリ全体を Vercel にデプロイした場合）に代理があれば自動で使う
+        var baiduAutoProxy = '';
+        if (location.protocol === 'http:' || location.protocol === 'https:') {
+            (function() {
+                var probe = new XMLHttpRequest();
+                probe.open('GET', '/api/translate', true);
+                probe.timeout = 5000;
+                probe.onreadystatechange = function() {
+                    if (probe.readyState !== 4 || probe.status !== 200) return;
+                    try {
+                        var info = JSON.parse(probe.responseText);
+                        if (info && info.ok === true && /jimakuChan/i.test(String(info.service || ''))) {
+                            baiduAutoProxy = '/api/translate';
+                            if (selectedTranslationMethod === 'baidu' && baiduProxyEndpoint(baidu_proxy) === '') {
+                                updateTranslationStatus('待機中（百度翻訳・同一サイト）', '#666');
+                            }
+                        }
+                    } catch (e) {}
+                };
+                probe.send(null);
+            })();
+        }
+
         // 認識途中マーカー設定（デフォルト値：<< と >>）
         var interimMarkerLeft = getParam('interim_marker_left') ? decodeURIComponent(getParam('interim_marker_left')) : ' << ';
         var interimMarkerRight = getParam('interim_marker_right') ? decodeURIComponent(getParam('interim_marker_right')) : ' >>';
@@ -466,7 +493,42 @@
             
             return languageMapping[langCode] || langCode;
         }
-        
+
+        // 百度翻訳（通用文本翻訳）用の語種コード
+        function getBaiduLanguageId(langCode) {
+            const languageMapping = {
+                'ja': 'jp', 'ko': 'kor', 'zh-CN': 'zh', 'zh': 'zh', 'zh-TW': 'cht', 'zh-HK': 'cht',
+                'en': 'en', 'en-US': 'en', 'en-GB': 'en',
+                'fr': 'fra', 'fr-FR': 'fra', 'it': 'it', 'it-IT': 'it', 'de': 'de', 'de-DE': 'de',
+                'es': 'spa', 'es-ES': 'spa', 'es-MX': 'spa', 'es-US': 'spa', 'es-AR': 'spa', 'es-CO': 'spa',
+                'pt': 'pt', 'pt-BR': 'pt', 'pt-PT': 'pt', 'ru': 'ru', 'ru-RU': 'ru', 'uk': 'ukr', 'uk-UA': 'ukr',
+                'pl': 'pl', 'pl-PL': 'pl', 'nl': 'nl', 'nl-NL': 'nl', 'sv': 'swe', 'sv-SE': 'swe', 'tr': 'tr', 'tr-TR': 'tr',
+                'id': 'id', 'id-ID': 'id', 'vi': 'vie', 'vi-VN': 'vie', 'th': 'th', 'th-TH': 'th',
+                'ar': 'ara', 'ar-SA': 'ara', 'el': 'el', 'el-GR': 'el', 'hi': 'hi', 'hi-IN': 'hi'
+            };
+            return languageMapping[langCode] || languageMapping[String(langCode).split('-')[0]] || '';
+        }
+
+        // 百度翻訳の代理エンドポイントを整える（ルート URL だけ／/api/translate／?token=… に対応）
+        function baiduProxyEndpoint(u) {
+            var s = String(u || '').trim();
+            if (!s) return '';
+            s = s.replace(/#.*$/, '');
+            var qi = s.indexOf('?');
+            var bpath = (qi >= 0 ? s.slice(0, qi) : s).replace(/\/+$/, '');
+            var bquery = qi >= 0 ? s.slice(qi) : '';
+            var absolute = /^https?:\/\//i.test(s);
+            // ドメインらしくない（＝同一オリジンのパス）なら先頭の / を補う
+            if (!absolute && bpath.charAt(0) !== '/' && bpath.split('/')[0].indexOf('.') < 0) bpath = '/' + bpath;
+            var ep = (/\/api\/[a-z]+$/i.test(bpath) ? bpath : bpath + '/api/translate') + bquery;
+            return (absolute || bpath.charAt(0) === '/') ? ep : ('https://' + ep);
+        }
+
+        // 実際に使う代理（アプリ設定 ＞ 同一サイトの自動検出）
+        function effectiveBaiduProxy() {
+            return baiduProxyEndpoint(baidu_proxy) || baiduAutoProxy;
+        }
+
         let languageId = getFilterLanguageId(arg_recog);
         const baseURL = "https://raw.githubusercontent.com/sayonari/goodBadWordlist/main/";
         const badListPath = `/BadList.txt`; // 禁止ワードリストのパス
@@ -1544,8 +1606,161 @@
                     // 翻訳処理フラグ（重複実行を防ぐ）
                     let translationProcessed = false;
                     
+                    // ===== 百度翻訳（通用文本翻訳・代理経由）=====
+                    // 選ばれていれば最初に試し、失敗したら Chrome → GAS の順に回退する
+                    var baiduTargets = [];
+                    if (arg_trans != null) baiduTargets.push(1);
+                    if (arg_trans2 != null) baiduTargets.push(2);
+                    if (arg_trans3 != null) baiduTargets.push(3);
+                    var transIdsOf = ['', 'trans_text', 'trans_text2', 'trans_text3'];
+                    var baiduPending = 0, baiduFailed = false;
+
+                    function transDestOf(idx) {
+                        return idx === 1 ? trans_destlang : (idx === 2 ? trans2_destlang : trans3_destlang);
+                    }
+                    function showTranslationResult(idx, out) {
+                        var filtered = applyTranslationFilter(out, idx);
+                        var base = transIdsOf[idx];
+                        document.getElementById(base + '-imb').innerHTML = filtered;
+                        document.getElementById(base + '-bg').innerHTML = filtered;
+                        document.getElementById(base + '-fg').innerHTML = filtered;
+                        if (idx === 1) isTextTranslation1Complete = true;
+                        else if (idx === 2) isTextTranslation2Complete = true;
+                        else isTextTranslation3Complete = true;
+                        startTranslationDeleteTimer();
+                    }
+                    function allTranslationDone() {
+                        var total = 0, done = 0;
+                        if (arg_trans != null) { total++; if (isTextTranslation1Complete) done++; }
+                        if (arg_trans2 != null) { total++; if (isTextTranslation2Complete) done++; }
+                        if (arg_trans3 != null) { total++; if (isTextTranslation3Complete) done++; }
+                        return total > 0 && done === total;
+                    }
+                    function gasTranslateOne(idx) {
+                        if (!gas_key) { updateTranslationStatus('GAS キーが未設定', '#cc0000'); return; }
+                        var xhr = new XMLHttpRequest();
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState !== 4) return;
+                            if (xhr.status === 200) {
+                                var body = xhr.responseText;
+                                try {
+                                    var j = JSON.parse(body);
+                                    if (j.translatedText) {
+                                        body = j.translatedText;
+                                        if (j.translatedCount !== undefined) document.getElementById('translationCount').innerHTML = j.translatedCount;
+                                    }
+                                } catch (e) {}
+                                showTranslationResult(idx, body);
+                                if (allTranslationDone()) updateTranslationStatus('翻訳完了', '#00aa00');
+                            } else if (xhr.status === 429) {
+                                updateTranslationStatus('API上限エラー', '#cc0000');
+                            } else if (xhr.status === 403) {
+                                updateTranslationStatus('API認証エラー', '#cc0000');
+                            } else {
+                                updateTranslationStatus('翻訳エラー(HTTP:' + xhr.status + ')', '#cc0000');
+                            }
+                        };
+                        xhr.open('GET', TRANS_URL + '?text=' + encodeURIComponent(applyCustomDictionary(recog_text))
+                            + '&source=' + getTranslationLanguageId(trans_sourcelang) + '&target=' + transDestOf(idx), true);
+                        xhr.send(null);
+                    }
+                    function fallbackAfterBaidu() {
+                        var useChrome = !!(chromeTranslationReady && window.chromeTranslator);
+                        updateTranslationStatus(useChrome ? '百度翻訳に失敗 → Chrome翻訳に回退'
+                            : (gas_key ? '百度翻訳に失敗 → GAS翻訳に回退' : '百度翻訳に失敗'), '#cc8800');
+                        baiduTargets.forEach(function(idx) {
+                            if (useChrome) {
+                                window.chromeTranslator.translate(recog_text,
+                                    window.chromeTranslator.normalizeLanguageCode(trans_sourcelang),
+                                    window.chromeTranslator.normalizeLanguageCode(transDestOf(idx)))
+                                    .then(function(out) {
+                                        showTranslationResult(idx, out);
+                                        if (allTranslationDone()) updateTranslationStatus('翻訳完了', '#00aa00');
+                                    })
+                                    .catch(function() { gasTranslateOne(idx); });
+                            } else {
+                                gasTranslateOne(idx);
+                            }
+                        });
+                    }
+                    function baiduDone() {
+                        baiduPending--;
+                        if (baiduPending > 0) return;
+                        if (baiduFailed) fallbackAfterBaidu();
+                        else if (allTranslationDone()) updateTranslationStatus('百度翻訳完了', '#00aa00');
+                    }
+                    function baiduTranslateOne(idx) {
+                        var srcB = getBaiduLanguageId(trans_sourcelang);
+                        var dst = getBaiduLanguageId(transDestOf(idx));
+                        if (!dst) {
+                            baiduFailed = true;
+                            updateTranslationStatus('百度に未対応の翻訳先: ' + transDestOf(idx), '#cc8800');
+                            baiduDone();
+                            return;
+                        }
+                        // 認識言語と翻訳先が同じ場合はAPIを呼ばずそのまま表示（既存の Chrome/GAS と同じ扱い）
+                        if (srcB && srcB === dst) {
+                            showTranslationResult(idx, recog_text);
+                            baiduDone();
+                            return;
+                        }
+                        var body = 'q=' + encodeURIComponent(applyCustomDictionary(recog_text))
+                            + '&from=' + encodeURIComponent(getBaiduLanguageId(trans_sourcelang) || 'auto')
+                            + '&to=' + encodeURIComponent(dst);
+                        if (baidu_appid) body += '&appid=' + encodeURIComponent(baidu_appid);
+                        if (baidu_key) body += '&key=' + encodeURIComponent(baidu_key);
+
+                        var xhr = new XMLHttpRequest();
+                        var settled = false;
+                        var finish = function() { if (settled) return; settled = true; baiduDone(); };
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState !== 4) return;
+                            var translated = null;
+                            if (xhr.status === 200) {
+                                try {
+                                    var j = JSON.parse(xhr.responseText);
+                                    if (j && j.trans_result && j.trans_result.length) {
+                                        translated = j.trans_result.map(function(x) { return x.dst; }).join('\n');
+                                    } else if (j && j.error_code) {
+                                        baiduFailed = true;
+                                        updateTranslationStatus('百度翻訳エラー(' + j.error_code + ')', '#cc0000');
+                                    } else if (j && j.error) {
+                                        baiduFailed = true;
+                                        updateTranslationStatus('代理エラー: ' + (j.message || j.error), '#cc0000');
+                                    } else {
+                                        baiduFailed = true;
+                                        updateTranslationStatus('百度翻訳: 結果が空です', '#cc0000');
+                                    }
+                                } catch (e) {
+                                    baiduFailed = true;
+                                    updateTranslationStatus('代理の応答が不正', '#cc0000');
+                                }
+                            } else {
+                                baiduFailed = true;
+                                updateTranslationStatus(xhr.status === 403 ? '代理の token が違います' : ('代理に接続できません(HTTP:' + xhr.status + ')'), '#cc0000');
+                            }
+                            if (translated !== null) showTranslationResult(idx, translated);
+                            finish();
+                        };
+                        xhr.timeout = 15000;
+                        xhr.ontimeout = function() {
+                            baiduFailed = true;
+                            updateTranslationStatus('百度翻訳タイムアウト', '#cc0000');
+                            finish();
+                        };
+                        xhr.open('POST', effectiveBaiduProxy(), true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.send(body);
+                    }
+
                     // 選択された翻訳方法に基づいて翻訳処理を実行
-                    if (selectedTranslationMethod === 'chrome' && chromeTranslationReady) {
+                    if (selectedTranslationMethod === 'baidu' && baiduTargets.length > 0 && effectiveBaiduProxy()) {
+                        translationProcessed = true;   // 百度で処理する（失敗時は fallbackAfterBaidu が引き継ぐ）
+                        baiduPending = baiduTargets.length;
+                        updateTranslationStatus('百度翻訳中(' + baiduTargets.join(',') + ')', '#4CAF50');
+                        baiduTargets.forEach(function(idx) { baiduTranslateOne(idx); });
+                    }
+                    else if (selectedTranslationMethod === 'chrome' && chromeTranslationReady) {
                         // 少なくとも1つの翻訳言語が設定されているか確認
                         if (arg_trans != null || arg_trans2 != null || arg_trans3 != null) {
                             translationProcessed = true; // Chrome翻訳を実行したことを記録
@@ -2052,7 +2267,9 @@
             startRecognitionWatchdog();
 
             // 初期ステータス設定
-            if (gas_key != null && gas_key !== '') {
+            if (selectedTranslationMethod === 'baidu' && effectiveBaiduProxy()) {
+                updateTranslationStatus('待機中（百度翻訳）', '#666');
+            } else if (gas_key != null && gas_key !== '') {
                 updateTranslationStatus('待機中', '#666');
             } else {
                 updateTranslationStatus('API KEYなし', '#999');

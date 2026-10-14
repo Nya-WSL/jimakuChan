@@ -1,0 +1,11 @@
+# Vercel に公開したくないもの（作業用フォルダ・設計メモ・ツール類）
+# 注意：proxy/ は api/translate.js が読み込むので除外しないこと
+.agent/
+.spec/
+.output/
+.references/
+tools/
+test_tools/
+v2/tools/
+.git/
+*.md

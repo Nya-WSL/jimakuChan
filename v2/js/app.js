@@ -350,7 +350,8 @@
     });
     if (any) startTransTimer();
     const bad = results.filter(r => !r.ok);
-    setPill('#pillTrans', bad.length ? 'err' : 'on', bad.length ? (bad[0].error || 'error') : (results[0].via === 'chrome' ? 'Chrome' : results[0].via === 'gas' ? 'GAS' : t('pillTransIdle')));
+    const viaName = { chrome: 'Chrome', baidu: 'BAIDU', gas: 'GAS' };
+    setPill('#pillTrans', bad.length ? 'err' : 'on', bad.length ? (bad[0].error || 'error') : (viaName[results[0].via] || t('pillTransIdle')));
     updateTransCount();
   }
   function updateTransCount() {
@@ -600,6 +601,13 @@
     const gen = ++modelCheckGen;
     const tr = engine.translator;
     tr.method = S.translationMethod; tr.gasKey = S.gasKey;
+    tr.baiduProxyUrl = S.baiduProxyUrl; tr.baiduAppId = S.baiduAppId; tr.baiduKey = S.baiduKey;
+    // 同一サイト（リポジトリ全体を Vercel にデプロイした場合）に /api/translate があれば自動で使う
+    if (!S.baiduProxyUrl) await tr.detectSameOriginProxy();
+    $('#rowBaidu').style.opacity = $('#rowBaiduKeys').style.opacity = (S.translationMethod === 'baidu') ? 1 : .6;
+    const bst = $('#baiduStatus'), brdy = !!tr.baiduAvailable;
+    bst.textContent = brdy ? (tr.baiduProxyUrl ? t('baiduStatusOk') : t('baiduStatusSame')) : t('baiduStatusNone');
+    bst.className = 'status ' + (brdy ? 'ok' : 'warn');
     const ok = await tr.checkChrome();
     const st = $('#chromeApiStatus');
     st.textContent = ok ? t('chromeApiOk') : t('chromeApiNo');
@@ -795,7 +803,7 @@
       if (el && el.dataset && el.dataset.restart) restartEngine(); else if (path === 'recogModel' || path === 'recogMode') restartEngine();
     }
     if (path === 'recogModel' || path === 'recog') refreshLocalModelUI();
-    if (/^(recog$|trans\.|translationMethod|gasKey)/.test(path)) refreshTranslatorUI();
+    if (/^(recog$|trans\.|translationMethod|gasKey|baidu)/.test(path)) refreshTranslatorUI();
     if (/^(recog$|trans\.|filterOn|extraBad|extraGood)/.test(path)) rebuildFiltersDebounced();
     if (/^trans\.(\d)/.test(path)) { const k = Number(RegExp.$1); if (!S.trans[k] || S.trans[k] === 'none') clearLines([k + 1], false); }
     if (path === 'wordReplace') { rebuildReplace(); updateFilterTest(); }
