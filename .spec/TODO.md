@@ -1,5 +1,10 @@
 # TODO - タスクリスト
 
+## 2026-10-15 GA（Google Analytics）を削除
+- [x] `index.html`・`main.html`・`v2/index.html` から gtag.js を削除
+      → `_ga` の cookie 警告が消え，中国本土での外部リクエストもなくなる．gtag() を呼ぶコードは無し
+- 復元する場合は 0c37705 に元のコードが残っている
+
 ## 2026-10-15 追加：フロント＋代理を Vercel にまとめてデプロイ（詳細は SPEC.md 追記）
 - [x] ルート `api/translate.js`（`proxy/baidu_proxy/api/translate.js` を読み込む入り口）・`vercel.json`（リージョン hkg1）・`.vercelignore`
 - [x] v2：同一サイトの代理を自動検出（`detectSameOriginProxy`）＋状態表示「代理 設定済み（同一サイト）」＋ `/api/translate` 相対パス対応

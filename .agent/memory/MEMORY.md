@@ -35,3 +35,4 @@
 - **start(track) は例外なしで黙って動かないことがある**（Issue #14・2026-10-11）：例外だけを見たフォールバックでは足りない．v2 は「結果ゼロのまま watchdog 作り直し 2 回」で検出し，プルダウンの「マイク選択を使わない」（'direct'，localStorage 保存）へ切替．判定は app.js の noTrack()（未対応 or direct）に集約してある
 - **Chrome 翻訳モデルは英語との組（en_ja, en_ko …）で入り英語経由で訳す**（~/Library/Application Support/Google/Chrome/TranslateKit/models/）．認識 ja で翻訳が全部止まる＝en_ja の取得・読込不良が本命．利用者への案内は「翻訳先の選び直し（change で取得開始）」→ chrome://on-device-translation-internals で確認・入れ直し → Chrome 再起動．**GAS API はキー取得が難しいので利用者に勧めない**（2026-10-14 先生）
 - **宣伝動画の効果音**（2026-10-14 神託 PV）：「神々しい」＝西洋・キリスト教的（パイプオルガン，女性コーラスの「アー」，ウィンドベル＝ツリーチャイムの「ちりちりーん」，「パーン」と光が差す和音）．**鐘・鈴・梵鐘・ハープ（琴に聞こえる）は和風・仏教的になるので使わない**．合成は v2/tools/promo_video/sfx_divine.py，ビルドは build_divine.mjs（--remix で音だけ作り直し）
+- **新增的文档与提交信息使用中文**：新建的 README、步骤文档、spec 文件、导出资料以及 commit message 都用中文写；已有的日文文档不主动改写（AGENTS.md 由人管理，不修改）；聊天回复同样用中文
