@@ -6,7 +6,8 @@
 - [x] v1：`main.html` で起動時に自動検出（`baiduAutoProxy` / `effectiveBaiduProxy`）＋相対パス対応＋タイムアウト処理
 - [x] タイムアウト調整（代理 8 秒／アプリ 15 秒），proxy と v2/README に Vercel 一括デプロイ手順（方式 A/B）を追記
 - [x] 回帰テストに自動検出・相対パスのチェックを追加し ALL PASS（27 項目）
-- [ ] 先生の実機テスト（Vercel にルートをデプロイ → 開くだけで百度翻訳が使えるか）→ コミット・push
+- [x] `/v2`（末尾スラッシュ無し）で開くと静的ファイルが 404 になる問題を修正（`v2/index.html` の `<base>` 差し込み＋`app.js` の `baseUrl()`/OBS パスの末尾スラッシュ対応．詳細は KNOWLEDGE.md）
+- [ ] 先生の実機テスト：再デプロイ → `/v2` と `/v2/` の両方で表示・翻訳・OBS 用 URL を確認 → コミット・push
 
 ## 2026-10-14 追加：翻訳方法「百度翻訳」対応（v1・v2／詳細は SPEC.md 追加分）
 - [x] Vercel プロキシを新規作成（`proxy/baidu_proxy/`：api/translate.js・package.json・README.md）

@@ -36,6 +36,21 @@
 - 結論：网页版は反爬で守られており，サーバー（とくに Vercel のような机房 IP）から再現するのは非現実的．
   正式には官方 API（appid＋MD5 署名）を使う（利用者に案内済み）
 
+## 2026-10-15 Vercel で /v2（末尾スラッシュ無し）を開くと v2 が壊れる件
+- 症状：`https://jimakuchan.vercel.app/v2` で開くと `./css/app.css` や `./js/*.js` が 404（＝`/css/…` `/js/…` を探しに行く）．
+  ルートの `js/i18n.js`（v1 のもの）だけは存在するので読み込まれ，「Translation not found for key: appName」が出る．
+  `./overlay.html` もルートの（v1 の）overlay.html に当たってしまう
+- 原因：URL に末尾スラッシュが無いと，相対 URL の基準が「そのページのディレクトリ」ではなく親（`/`）になる．
+  Vercel は `/v2/` を `/v2` に 308 で寄せることがある（`trailingSlash` 未指定時の挙動）ため，URL 側で回避できない
+- 対策（ホスト非依存・実装済み）
+  - `v2/index.html` の先頭で，`location.pathname` からディレクトリを作って `<base>` を差し込む
+    （`/v2` `/v2/` `/v2/index.html` のどれでも `/v2/` になる．GitHub Pages の `/jimakuChan/v2` でも同様）
+  - `v2/js/app.js` の `baseUrl()` と OBS 用パスを末尾スラッシュ安全に（そのままだと
+    `…/v2` + `overlay.html` = `…/v2overlay.html` という壊れた URL を OBS／ポップアップに渡してしまう）
+  - `vercel.json` の `trailingSlash: true` は**使わない**：拡張子の無い `/api/translate` も末尾スラッシュへ
+    リダイレクトされ得るため（同一オリジンの fetch は追従できても，他サイトからの CORS 利用が壊れる恐れ）
+- 確認：`<base>`/`dirName()`/`baseUrl()` のロジックを 15 パターンで検証（ALL PASS）
+
 ## 技術的な知見
 - BroadcastChannel は file:// では別ウィンドウに届かないことがある → popup には postMessage も併用
 - Playwright headless で `Translator.availability()` の Promise が GC される → タイムアウトで保護

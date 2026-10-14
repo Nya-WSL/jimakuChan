@@ -82,7 +82,17 @@
   }
   const debounce = (fn, ms) => { let id; return (...a) => { clearTimeout(id); id = setTimeout(() => fn(...a), ms); }; };
   function b64url(obj) { return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
-  function baseUrl() { return location.href.replace(/[#?].*$/, '').replace(/index\.html$/, ''); }
+  /** 現在のページのディレクトリ（末尾スラッシュ付き）．末尾スラッシュ無しの URL（例 /v2）でも壊れないように */
+  function dirName(p) {
+    let d = decodeURIComponent(p === undefined ? location.pathname : p);
+    if (/\/[^/]*\.[^/]+$/.test(d)) d = d.replace(/[^/]*$/, '');   // 末尾がファイル名（index.html など）なら落とす
+    return /\/$/.test(d) ? d : d + '/';
+  }
+  function baseUrl() {
+    let u = location.href.replace(/[#?].*$/, '');
+    if (/\/[^/]*\.[^/]+$/.test(u)) u = u.replace(/[^/]*$/, '');
+    return /\/$/.test(u) ? u : u + '/';
+  }
   function overlayUrl(withCfg = true) {
     const u = baseUrl() + 'overlay.html';
     return withCfg ? u + '?cfg=' + b64url(displayConfig()) : u;
@@ -92,12 +102,12 @@
     const cfg = '?cfg=' + b64url(displayConfig());
     if (location.protocol === 'file:') {
       // OBS には file:// を「ローカルファイル」として渡す（クエリは付けられないので設定は接続後に配信）
-      const path = decodeURIComponent(location.pathname).replace(/index\.html$/, '') + 'overlay.html';
+      const path = dirName() + 'overlay.html';
       return { local: true, localFile: path, url: 'file://' + path, note: 'file' };
     }
     if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && location.protocol === 'https:') {
       // 自己署名 https は OBS(CEF) が拒否するので http ポート（run_server.py が 4444 で併設）を使う
-      const base = location.pathname.replace(/[^/]*$/, '');
+      const base = dirName();
       return { local: false, url: 'http://' + location.hostname + ':4444' + base + 'overlay.html' + cfg, note: 'localhost-http' };
     }
     return { local: false, url: overlayUrl(true), note: 'web' };
