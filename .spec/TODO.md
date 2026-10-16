@@ -1,5 +1,12 @@
 # TODO - タスクリスト
 
+## 2026-10-16 百度翻訳：呼び出し結果をログに残す（`54001 署名エラー` の切り分け用）
+- [x] 代理（`proxy/baidu_proxy/api/translate.js`）：百度への呼び出し結果（from/to・q 長・appid・appid/key の取得元・HTTP ステータス・応答本文 300 文字）を `console.log`（Vercel の Functions ログで見る）．密钥と sign は出さない
+- [x] v2（`v2/js/translator.js`）：百度 API の応答（OK／error_code／結果が空／JSON でない／HTTP エラー）を，代理 URL（`token=` は伏せる）つきでログ．`err.detail` に応答 JSON を保持
+- [x] v1（`main.html`）：同じく呼び出し結果（OK／百度エラー／代理エラー／不正／タイムアウト）をログ
+- [x] 回帰テスト `v2/tools/promo_video/test_baidu.mjs` ALL PASS（30 項目）
+- [ ] 先生の実機で再現 → ログを見て `54001` の原因（環境変数の値か，再デプロイ漏れか）を確定させる
+
 ## 2026-10-15 GA（Google Analytics）を削除
 - [x] `index.html`・`main.html`・`v2/index.html` から gtag.js を削除
       → `_ga` の cookie 警告が消え，中国本土での外部リクエストもなくなる．gtag() を呼ぶコードは無し

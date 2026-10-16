@@ -1704,28 +1704,40 @@
                         var finish = function() { if (settled) return; settled = true; baiduDone(); };
                         xhr.onreadystatechange = function() {
                             if (xhr.readyState !== 4) return;
+                            // 呼び出し結果をログに残す（切り分け用．代理 URL の token は伏せる）
+                            var logUrl = String(effectiveBaiduProxy() || '').replace(/([?&]token=)[^&]*/g, '$1***');
+                            var logApi = function(label, warn) {
+                                (warn ? console.warn : console.log)('[baidu] 呼び出し結果（' + label + '）:', logUrl,
+                                    'HTTP ' + xhr.status, String(xhr.responseText || '').slice(0, 300));
+                            };
                             var translated = null;
                             if (xhr.status === 200) {
                                 try {
                                     var j = JSON.parse(xhr.responseText);
                                     if (j && j.trans_result && j.trans_result.length) {
                                         translated = j.trans_result.map(function(x) { return x.dst; }).join('\n');
+                                        logApi('OK');
                                     } else if (j && j.error_code) {
                                         baiduFailed = true;
+                                        logApi('百度エラー ' + j.error_code, true);
                                         updateTranslationStatus('百度翻訳エラー(' + j.error_code + ')', '#cc0000');
                                     } else if (j && j.error) {
                                         baiduFailed = true;
+                                        logApi('代理エラー', true);
                                         updateTranslationStatus('代理エラー: ' + (j.message || j.error), '#cc0000');
                                     } else {
                                         baiduFailed = true;
+                                        logApi('結果が空', true);
                                         updateTranslationStatus('百度翻訳: 結果が空です', '#cc0000');
                                     }
                                 } catch (e) {
                                     baiduFailed = true;
+                                    logApi('応答が不正', true);
                                     updateTranslationStatus('代理の応答が不正', '#cc0000');
                                 }
                             } else {
                                 baiduFailed = true;
+                                logApi('HTTP エラー', true);
                                 updateTranslationStatus(xhr.status === 403 ? '代理の token が違います' : ('代理に接続できません(HTTP:' + xhr.status + ')'), '#cc0000');
                             }
                             if (translated !== null) showTranslationResult(idx, translated);
@@ -1734,6 +1746,8 @@
                         xhr.timeout = 15000;
                         xhr.ontimeout = function() {
                             baiduFailed = true;
+                            console.warn('[baidu] 呼び出し結果（タイムアウト）:',
+                                String(effectiveBaiduProxy() || '').replace(/([?&]token=)[^&]*/g, '$1***'));
                             updateTranslationStatus('百度翻訳タイムアウト', '#cc0000');
                             finish();
                         };

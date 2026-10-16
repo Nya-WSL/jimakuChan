@@ -223,25 +223,53 @@
         throw new Error(e && e.name === 'AbortError' ? '百度翻訳タイムアウト' : '翻訳代理に接続できません');
       } finally { clearTimeout(tid); }
 
+      // 呼び出し結果は必ずログに残す（切り分け用．代理 URL の token は伏せる）
+      const logUrl = String(url).replace(/([?&]token=)[^&]*/gi, '$1***');
+      const logApi = (label, detail, warn) => (warn ? console.warn : console.log)(
+        '[trans] 百度 API 呼び出し結果（' + label + '）:', logUrl, detail);
+
       if (!r.ok) {
-        let msg = '';
-        try { const j = await r.json(); msg = (j && (j.message || j.error)) || ''; } catch (e) {}
+        let msg = '', rawBody = '';
+        try {
+          rawBody = await r.text();
+          const j = JSON.parse(rawBody);
+          msg = (j && (j.message || j.error)) || '';
+        } catch (e) { /* JSON でない応答（HTML など）は本文をそのままログに残す */ }
+        logApi('HTTP ' + r.status, rawBody.slice(0, 300), true);
         if (r.status === 403) throw new Error(msg || '代理の token が違います');
         if (r.status === 400) throw new Error(msg || '代理の設定不足（APP ID・密钥）');
         throw new Error(msg || ('代理エラー HTTP ' + r.status));
       }
 
+      let raw = '';
       let j = null;
-      try { j = await r.json(); } catch (e) { throw new Error('代理の応答が不正'); }
+      try {
+        raw = await r.text();
+        j = JSON.parse(raw);
+      } catch (e) {
+        logApi('応答が JSON ではない', raw.slice(0, 300), true);
+        throw new Error('代理の応答が不正');
+      }
+
       if (j && j.error_code) {
+        logApi('エラー', raw, true);
         const code = String(j.error_code);
         const err = new Error(BAIDU_ERR[code] || ('百度エラー ' + code + (j.error_msg ? '：' + j.error_msg : '')));
         err.code = code;
+        err.detail = j;                 // 呼び出し結果（error_code / error_msg）を保持
         throw err;
       }
-      if (j && j.error) throw new Error(j.message || j.error);
+      if (j && j.error) {
+        logApi('代理エラー', raw, true);
+        throw new Error(j.message || j.error);
+      }
       const tr = j && j.trans_result;
-      if (Array.isArray(tr) && tr.length) return tr.map(x => x.dst).join('\n');
+      if (Array.isArray(tr) && tr.length) {
+        const out = tr.map(x => x.dst).join('\n');
+        logApi('OK', JSON.stringify({ from: j.from, to: j.to, dst: out }));
+        return out;
+      }
+      logApi('結果が空', raw, true);
       throw new Error('翻訳結果が空でした');
     }
 

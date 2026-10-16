@@ -108,9 +108,17 @@ module.exports = async function handler(req, res) {
       signal: ac.signal,
     });
     const text = await r.text();
+    // 呼び出し結果をログに残す（Vercel の Functions ログで確認できる．密钥・sign は出さない）
+    console.log('[baidu] 呼び出し結果:', JSON.stringify({
+      from, to, qLen: q.length, appid,
+      appidSrc: process.env.BAIDU_APPID ? 'env' : 'body',   // 半分だけ env だと混ざって署名エラーになる
+      keySrc: process.env.BAIDU_KEY ? 'env' : 'body',
+      http: r.status, body: text.slice(0, 300),
+    }));
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.status(200).send(text);           // 百度の応答をそのまま返す（error_code の解釈はアプリ側）
   } catch (e) {
+    console.warn('[baidu] 呼び出しに失敗:', (e && e.message) || e);
     const aborted = e && (e.name === 'AbortError' || e.code === 'ABORT_ERR');
     res.status(aborted ? 504 : 502).json({
       error: aborted ? 'upstream-timeout' : 'upstream-error',
